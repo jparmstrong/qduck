@@ -44,90 +44,91 @@ K run_query(K query) {
         // Create appropriate KDB column type
         duckdb_type col_type = duckdb_column_type(&result, i);
         K col;
-    
+
         switch (col_type) {
             case DUCKDB_TYPE_BOOLEAN:
                 col = ktn(KB, nrows);  // Boolean column
                 for (int j = 0; j < nrows; j++) {
-                    kG(col)[j] = ((bool*)duckdb_column_data(&result, i))[j];
+                    kG(col)[j] = duckdb_value_is_null(&result, i, j) ? 0x00 : ((bool*)duckdb_column_data(&result, i))[j];
                 }
                 break;
             case DUCKDB_TYPE_TINYINT:
                 col = ktn(KH, nrows);  // Short column (KDB+ short)
                 for (int j = 0; j < nrows; j++) {
-                    kH(col)[j] = ((int8_t*)duckdb_column_data(&result, i))[j];
+                    kH(col)[j] = duckdb_value_is_null(&result, i, j) ? nh : ((int8_t*)duckdb_column_data(&result, i))[j];
                 }
                 break;
             case DUCKDB_TYPE_SMALLINT:
                 col = ktn(KH, nrows);  // Short column (KDB+ short)
                 for (int j = 0; j < nrows; j++) {
-                    kH(col)[j] = ((int16_t*)duckdb_column_data(&result, i))[j];
+                    kH(col)[j] = duckdb_value_is_null(&result, i, j) ? nh : ((int16_t*)duckdb_column_data(&result, i))[j];
                 }
                 break;
             case DUCKDB_TYPE_INTEGER:
                 col = ktn(KI, nrows);  // Integer column
                 for (int j = 0; j < nrows; j++) {
-                    kI(col)[j] = ((int32_t*)duckdb_column_data(&result, i))[j];
+                    kI(col)[j] = duckdb_value_is_null(&result, i, j) ? ni : ((int32_t*)duckdb_column_data(&result, i))[j];
                 }
                 break;
             case DUCKDB_TYPE_BIGINT:
                 col = ktn(KJ, nrows);  // Long column (KDB+ long)
                 for (int j = 0; j < nrows; j++) {
-                    kJ(col)[j] = ((int64_t*)duckdb_column_data(&result, i))[j];
+                    kJ(col)[j] = duckdb_value_is_null(&result, i, j) ? nj : ((int64_t*)duckdb_column_data(&result, i))[j];
                 }
                 break;
             case DUCKDB_TYPE_FLOAT:
                 col = ktn(KE, nrows);  // Real column (KDB+ real)
                 for (int j = 0; j < nrows; j++) {
-                    kE(col)[j] = ((float*)duckdb_column_data(&result, i))[j];
+                    kE(col)[j] = duckdb_value_is_null(&result, i, j) ? nf : ((float*)duckdb_column_data(&result, i))[j];
                 }
                 break;
             case DUCKDB_TYPE_DOUBLE:
                 col = ktn(KF, nrows);  // Float column (KDB+ float)
                 for (int j = 0; j < nrows; j++) {
-                    kF(col)[j] = ((double*)duckdb_column_data(&result, i))[j];
+                    kF(col)[j] = duckdb_value_is_null(&result, i, j) ? nf : ((double*)duckdb_column_data(&result, i))[j];
                 }
                 break;
             case DUCKDB_TYPE_VARCHAR:
                 col = ktn(KS, nrows);  // String column
                 for (int j = 0; j < nrows; j++) {
-                    kS(col)[j] = ss((S)((char**)duckdb_column_data(&result, i))[j]);
+                    kS(col)[j] = duckdb_value_is_null(&result, i, j) ? ss("") : ss((S)((char**)duckdb_column_data(&result, i))[j]);
                 }
                 break;
             case DUCKDB_TYPE_DATE:
                 col = ktn(KI, nrows);  // Date column (KDB+ date)
                 for (int j = 0; j < nrows; j++) {
-                    int32_t duckdb_date = ((int32_t*)duckdb_column_data(&result, i))[j];
-                    kI(col)[j] = duckdb_date - 10957;  // Adjust epoch from 1970 to 2000
+                    kI(col)[j] = duckdb_value_is_null(&result, i, j) ? ni : ((int32_t*)duckdb_column_data(&result, i))[j] - 10957;
                 }
                 col->t = KD;  // Set type tag to date
                 break;
             case DUCKDB_TYPE_TIMESTAMP:
                 col = ktn(KJ, nrows);  // Timestamp column (KDB+ datetime)
                 for (int j = 0; j < nrows; j++) {
-                    int64_t duckdb_timestamp = ((int64_t*)duckdb_column_data(&result, i))[j];
-                    kJ(col)[j] = (duckdb_timestamp - (int64_t)10957 * 86400 * 1000000) * 1000;
+                    kJ(col)[j] = duckdb_value_is_null(&result, i, j) ? nj : (((int64_t*)duckdb_column_data(&result, i))[j] - (int64_t)10957 * 86400 * 1000000) * 1000;
                 }
                 col->t = KP;  // Set type tag to timestamp
                 break;
             case DUCKDB_TYPE_TIME:
                 col = ktn(KI, nrows);  // Time column (KDB+ time)
                 for (int j = 0; j < nrows; j++) {
-                    int64_t duckdb_time = ((int64_t*)duckdb_column_data(&result, i))[j];
-                    kI(col)[j] = duckdb_time / 1000;  // Convert microseconds to milliseconds
+                    kI(col)[j] = duckdb_value_is_null(&result, i, j) ? ni : ((int64_t*)duckdb_column_data(&result, i))[j] / 1000;
                 }
                 col->t = KT;  // Set type tag to time
                 break;
             case DUCKDB_TYPE_INTERVAL:
-                col = ktn(0, nrows);  // Interval column (KDB+ list of intervals)
+                col = ktn(0, nrows);  // Create a general list for intervals
                 for (int j = 0; j < nrows; j++) {
-                    duckdb_interval* interval = &((duckdb_interval*)duckdb_column_data(&result, i))[j];
-                    K interval_list = knk(3, ki(interval->months), ki(interval->days), kj(interval->micros));
-                    kK(col)[j] = interval_list;
+                    if (duckdb_value_is_null(&result, i, j)) {
+                        kK(col)[j] = knk(3, ki(ni), ki(ni), kj(nj));  // Null interval
+                    } else {
+                        duckdb_interval* interval = &((duckdb_interval*)duckdb_column_data(&result, i))[j];
+                        kK(col)[j] = knk(3, ki(interval->months), ki(interval->days), kj(interval->micros));
+                    }
                 }
                 break;
             default:
                 duckdb_destroy_result(&result);
+                printf("Unsupported column type: %d\n", col_type);
                 return krr("Unsupported column type");
         }
     
