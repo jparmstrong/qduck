@@ -1,6 +1,6 @@
 # qduck
 
-Shared libary that enables KDB/Q to make queries using duckdb.
+Enables KDB/Q to run duckdb queries.
 
 ## Installation
 

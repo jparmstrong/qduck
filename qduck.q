@@ -4,14 +4,15 @@ duck:`qduck 2: (`run_query; 1);
 
 init_duckdb `$":memory:";
 
--1 "Loaded data to t table";
+\
+
+// Examples of loading different file formats with DuckDB
 
 t1:duck `$"SELECT * FROM 'sample/sample.parquet';"
 
 t2:duck `$"SELECT * FROM 'sample/test.csv';"
 
-
-\
+t3:duck `$"SELECT * FROM 'https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet' limit 10;"
 
 -1 "Load from s3 bucket";
 duck `$"INSTALL httpfs; LOAD httpfs; INSTALL aws; LOAD aws;"
