@@ -1,4 +1,4 @@
-// Written by JP Armstrong
+// Written by JP Armstrong <jp@armstrong.sh>
 // License: unlicense / public domain
 // This file is part of qduck, a DuckDB interface for kdb+.
 
