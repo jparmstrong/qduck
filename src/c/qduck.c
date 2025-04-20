@@ -1,185 +1,115 @@
-/*
-   Copyright 2025 JP Armstrong
+#include<duckdb.h>
+#include<stdlib.h>
+#include<string.h>
+#include"k.h"
 
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
+#define dkO(p,d)(duckdb_open(p,d)!=DuckDBSuccess)
+#define dkC(d,c)(duckdb_connect(d,c)!=DuckDBSuccess)
+#define dkQ(c,s,r)(duckdb_query(c,s,r)!=DuckDBSuccess)
+#define dkD(r)duckdb_destroy_result(r)
+#define dkCC(r)duckdb_column_count(r)
+#define dkRC(r)duckdb_row_count(r)
+#define dkCN(r,i)duckdb_column_name(r,i)
+#define dkCT(r,i)duckdb_column_type(r,i)
+#define dkCD(r,i)duckdb_column_data(r,i)
+#define dkN(r,i,j)duckdb_value_is_null(r,i,j)
+duckdb_database d;duckdb_connection c;
 
-       http://www.apache.org/licenses/LICENSE-2.0
-
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
-
-*/
-#include <duckdb.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include "k.h"
-
-// Initialize the DuckDB database and context
-duckdb_database db;
-duckdb_connection con;
-
-// Function to initialize the DuckDB instance
-K init(K path) {
-    if (path->t != KC) return krr("type");
-
-    char* db_path = (char*)malloc(path->n + 1);
-    if (!db_path) return krr("memory");
-    memcpy(db_path, path->G0, path->n);
-    db_path[path->n] = '\0';
-
-    if (duckdb_open(db_path, &db) != DuckDBSuccess) {
-        free(db_path);
-        return krr("Could not open DuckDB");
-    }
-    if (duckdb_connect(db, &con) != DuckDBSuccess) {
-        duckdb_close(&db);
-        free(db_path);
-        return krr("Could not connect to DuckDB");
-    }
-    free(db_path);
+// Initialize DuckDB
+K init(K p) {
+    if (p->t != KC) return krr("type");
+    char* s = malloc(p->n + 1);
+    if (!s) return krr("memory");
+    memcpy(s, p->G0, p->n);
+    s[p->n] = '\0';
+    if (dkO(s, &d)) { free(s); return krr("open"); }
+    if (dkC(d, &c)) { duckdb_close(&d); free(s); return krr("connect"); }
+    free(s);
     return (K)0;
 }
 
-// Function to execute SQL queries and return results as KDB table
-K query(K query) {
-    if (query->t != KC) return krr("type");
-
-    char* sql = (char*)malloc(query->n + 1);
-    if (!sql) return krr("memory");
-    memcpy(sql, query->G0, query->n);
-    sql[query->n] = '\0';
-    
-    duckdb_result result;
-    if (duckdb_query(con, sql, &result) != DuckDBSuccess) {
-        free(sql);
-        return krr("Query failed");
-    }
-    free(sql);
-
-    // Convert DuckDB result to KDB+/q KTable
-    int ncols = duckdb_column_count(&result);
-    int nrows = duckdb_row_count(&result);
-    
-    K cols = ktn(0, ncols);  // List of columns
-    K col_names = ktn(KS, ncols);  // List of column names
-    
-    for (int i = 0; i < ncols; i++) {
-        const char* col_name = duckdb_column_name(&result, i);
-        kS(col_names)[i] = ss((S)col_name); // Set column name
-    
-        // Create appropriate KDB column type
-        duckdb_type col_type = duckdb_column_type(&result, i);
+// Execute query
+K query(K q){
+    if(q->t!=KC)return krr("type");
+    char*s=malloc(q->n+1);
+    if(!s)return krr("memory");
+    memcpy(s,q->G0,q->n);
+    s[q->n]='\0';
+    duckdb_result r;
+    if(dkQ(c,s,&r)){free(s);return krr("query");}
+    free(s);
+    int nc=dkCC(&r),nr=dkRC(&r);
+    K cols=ktn(0,nc),names=ktn(KS,nc);
+    for(int x=0;x<nc;x++){
+        kS(names)[x]=ss((S)dkCN(&r,x));
+        duckdb_type t=dkCT(&r,x);
         K col;
-
-        switch (col_type) {
+        switch(t){
             case DUCKDB_TYPE_BOOLEAN:
-                col = ktn(KB, nrows);  // Boolean column
-                for (int j = 0; j < nrows; j++) {
-                    kG(col)[j] = duckdb_value_is_null(&result, i, j) ? 0x00 : ((bool*)duckdb_column_data(&result, i))[j];
-                }
+                col=ktn(KB,nr);
+                DO(nr,kG(col)[i]=dkN(&r,x,i)?0x00:((bool*)dkCD(&r,x))[i]);
                 break;
             case DUCKDB_TYPE_TINYINT:
-                col = ktn(KH, nrows);  // Short column (KDB+ short)
-                for (int j = 0; j < nrows; j++) {
-                    kH(col)[j] = duckdb_value_is_null(&result, i, j) ? nh : ((int8_t*)duckdb_column_data(&result, i))[j];
-                }
+                col=ktn(KH,nr);
+                DO(nr,kH(col)[i]=dkN(&r,x,i)?nh:((int8_t*)dkCD(&r,x))[i]);
                 break;
             case DUCKDB_TYPE_SMALLINT:
-                col = ktn(KH, nrows);  // Short column (KDB+ short)
-                for (int j = 0; j < nrows; j++) {
-                    kH(col)[j] = duckdb_value_is_null(&result, i, j) ? nh : ((int16_t*)duckdb_column_data(&result, i))[j];
-                }
+                col=ktn(KH,nr);
+                DO(nr,kH(col)[i]=dkN(&r,x,i)?nh:((int16_t*)dkCD(&r,x))[i]);
                 break;
             case DUCKDB_TYPE_INTEGER:
-                col = ktn(KI, nrows);  // Integer column
-                for (int j = 0; j < nrows; j++) {
-                    kI(col)[j] = duckdb_value_is_null(&result, i, j) ? ni : ((int32_t*)duckdb_column_data(&result, i))[j];
-                }
+                col=ktn(KI,nr);
+                DO(nr,kI(col)[i]=dkN(&r,x,i)?ni:((int32_t*)dkCD(&r,x))[i]);
                 break;
             case DUCKDB_TYPE_BIGINT:
-                col = ktn(KJ, nrows);  // Long column (KDB+ long)
-                for (int j = 0; j < nrows; j++) {
-                    kJ(col)[j] = duckdb_value_is_null(&result, i, j) ? nj : ((int64_t*)duckdb_column_data(&result, i))[j];
-                }
+                col=ktn(KJ,nr);
+                DO(nr,kJ(col)[i]=dkN(&r,x,i)?nj:((int64_t*)dkCD(&r,x))[i]);
                 break;
             case DUCKDB_TYPE_FLOAT:
-                col = ktn(KE, nrows);  // Real column (KDB+ real)
-                for (int j = 0; j < nrows; j++) {
-                    kE(col)[j] = duckdb_value_is_null(&result, i, j) ? nf : ((float*)duckdb_column_data(&result, i))[j];
-                }
+                col=ktn(KE,nr);
+                DO(nr,kE(col)[i]=dkN(&r,x,i)?nf:((float*)dkCD(&r,x))[i]);
                 break;
             case DUCKDB_TYPE_DOUBLE:
-                col = ktn(KF, nrows);  // Float column (KDB+ float)
-                for (int j = 0; j < nrows; j++) {
-                    kF(col)[j] = duckdb_value_is_null(&result, i, j) ? nf : ((double*)duckdb_column_data(&result, i))[j];
-                }
+                col=ktn(KF,nr);
+                DO(nr,kF(col)[i]=dkN(&r,x,i)?nf:((double*)dkCD(&r,x))[i]);
                 break;
             case DUCKDB_TYPE_VARCHAR:
-                col = ktn(KS, nrows);  // String column
-                for (int j = 0; j < nrows; j++) {
-                    kS(col)[j] = duckdb_value_is_null(&result, i, j) ? ss("") : ss((S)((char**)duckdb_column_data(&result, i))[j]);
-                }
+                col=ktn(KS,nr);
+                DO(nr,kS(col)[i]=dkN(&r,x,i)?ss(""):ss((S)((char**)dkCD(&r,x))[i]));
                 break;
             case DUCKDB_TYPE_DATE:
-                col = ktn(KI, nrows);  // Date column (KDB+ date)
-                for (int j = 0; j < nrows; j++) {
-                    kI(col)[j] = duckdb_value_is_null(&result, i, j) ? ni : ((int32_t*)duckdb_column_data(&result, i))[j] - 10957;
-                }
-                col->t = KD;  // Set type tag to date
+                col=ktn(KI,nr);
+                DO(nr,kI(col)[i]=dkN(&r,x,i)?ni:((int32_t*)dkCD(&r,x))[i]-10957);
+                col->t=KD;
                 break;
             case DUCKDB_TYPE_TIMESTAMP:
-                col = ktn(KJ, nrows);  // Timestamp column (KDB+ datetime)
-                for (int j = 0; j < nrows; j++) {
-                    kJ(col)[j] = duckdb_value_is_null(&result, i, j) ? nj : (((int64_t*)duckdb_column_data(&result, i))[j] - (int64_t)10957 * 86400 * 1000000) * 1000;
-                }
-                col->t = KP;  // Set type tag to timestamp
+                col=ktn(KJ,nr);
+                DO(nr,kJ(col)[i]=dkN(&r,x,i)?nj:(((int64_t*)dkCD(&r,x))[i]-(int64_t)10957*86400*1000000)*1000);
+                col->t=KP;
                 break;
             case DUCKDB_TYPE_TIME:
-                col = ktn(KI, nrows);  // Time column (KDB+ time)
-                for (int j = 0; j < nrows; j++) {
-                    kI(col)[j] = duckdb_value_is_null(&result, i, j) ? ni : ((int64_t*)duckdb_column_data(&result, i))[j] / 1000;
-                }
-                col->t = KT;  // Set type tag to time
+                col=ktn(KI,nr);
+                DO(nr,kI(col)[i]=dkN(&r,x,i)?ni:((int64_t*)dkCD(&r,x))[i]/1000);
+                col->t=KT;
                 break;
             case DUCKDB_TYPE_INTERVAL:
-                col = ktn(0, nrows);  // Create a general list for intervals
-                for (int j = 0; j < nrows; j++) {
-                    if (duckdb_value_is_null(&result, i, j)) {
-                        kK(col)[j] = knk(3, ki(ni), ki(ni), kj(nj));  // Null interval
-                    } else {
-                        duckdb_interval* interval = &((duckdb_interval*)duckdb_column_data(&result, i))[j];
-                        kK(col)[j] = knk(3, ki(interval->months), ki(interval->days), kj(interval->micros));
-                    }
-                }
+                col=ktn(0,nr);
+                DO(nr,kK(col)[i]=dkN(&r,x,i)?knk(3,ki(ni),ki(ni),kj(nj)):knk(3,ki(((duckdb_interval*)dkCD(&r,x))[i].months),ki(((duckdb_interval*)dkCD(&r,x))[i].days),kj(((duckdb_interval*)dkCD(&r,x))[i].micros)));
                 break;
             default:
-                duckdb_destroy_result(&result);
-                printf("Unsupported column type: %d\n", col_type);
-                return krr("Unsupported column type");
+                dkD(&r);
+                return krr("unsupported");
         }
-    
-        // Add column to table
-        kK(cols)[i] = col;
+        kK(cols)[x]=col;
     }
-
-    duckdb_destroy_result(&result);
-    
-    // Create a dictionary with column names and column data
-    K dict = xD(col_names, cols);
-    
-    return xT(dict);  // Flip the dictionary into a table and return it
+    dkD(&r);
+    return xT(xD(names,cols));
 }
 
-// Function to close DuckDB connection
+// Close DuckDB
 K close(K _) {
-    duckdb_disconnect(&con);
-    duckdb_close(&db);
+    duckdb_disconnect(&c);
+    duckdb_close(&d);
     return (K)0;
 }
 
