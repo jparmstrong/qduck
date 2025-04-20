@@ -2,6 +2,8 @@
 
 This client API integrates DuckDB into KDB/Q, allowing users to query open data formats (CSV, Parquet, and Iceberg) on S3 buckets directly and return results in native KDB table format. This simplifies existing ETL processing and provides immediate access to new datasets without needing to convert to on-disk KDB format first.
 
+*Consider this experimental, test throughly before using in production. PRs are welcome!*
+
 ## Example
 
 ```
