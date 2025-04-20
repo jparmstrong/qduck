@@ -1,6 +1,6 @@
 # qduck - DuckDB client API for KDB/Q
 
-Enables KDB/Q devs to utilize duckdb capabilities including the ability to querying parquet, iceberg, and csv files from cloud storage buckets.
+This client API integrates DuckDB into KDB/Q, allowing users to query open data formats (CSV, Parquet, and Iceberg) on S3 buckets directly and return results in native KDB table format. This simplifies existing ETL processing and provides immediate access to new datasets without needing to convert to on-disk KDB format first.
 
 ## Example
 
@@ -32,7 +32,7 @@ This client API requires the duckdb c/c++ library which is available here:
 
 https://duckdb.org/docs/installation/?version=stable&environment=cplusplus&platform=linux&download_method=direct&architecture=x86_64
 
-Unzip to your prefered location.
+Unzip to your preferred location.
 
 Option 1: Add libduckdb to your LD_LIBRARY_PATH.
 
