@@ -18,12 +18,15 @@ K init(K path) {
     db_path[path->n] = '\0';
 
     if (duckdb_open(db_path, &db) != DuckDBSuccess) {
+        free(db_path);
         return krr("Could not open DuckDB");
     }
     if (duckdb_connect(db, &con) != DuckDBSuccess) {
         duckdb_close(&db);
+        free(db_path);
         return krr("Could not connect to DuckDB");
     }
+    free(db_path);
     return (K)0;
 }
 
@@ -38,9 +41,11 @@ K query(K query) {
     
     duckdb_result result;
     if (duckdb_query(con, sql, &result) != DuckDBSuccess) {
+        free(sql);
         return krr("Query failed");
     }
-    
+    free(sql);
+
     // Convert DuckDB result to KDB+/q KTable
     int ncols = duckdb_column_count(&result);
     int nrows = duckdb_row_count(&result);
@@ -156,7 +161,7 @@ K query(K query) {
 }
 
 // Function to close DuckDB connection
-K close_duckdb(K _) {
+K close(K _) {
     duckdb_disconnect(&con);
     duckdb_close(&db);
     return (K)0;

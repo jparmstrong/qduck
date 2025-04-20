@@ -24,7 +24,9 @@ q)count t
 3475226
 ```
 
-## Installation
+Additional examples are provided in `example.q`
+
+## Build and Run
 
 This client API requires the duckdb c/c++ library which is available here:
 
