@@ -1,3 +1,7 @@
+// Written by JP Armstrong
+// License: unlicense / public domain
+// This file is part of qduck, a DuckDB interface for kdb+.
+
 #include<duckdb.h>
 #include<stdlib.h>
 #include<string.h>
