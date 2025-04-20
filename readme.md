@@ -1,13 +1,36 @@
-# qduck
+# qduck - DuckDB client API for KDB/Q
 
-Enables KDB/Q to run duckdb queries.
+Enables KDB/Q devs to utilize duckdb capabilities including the ability to querying parquet, iceberg, and csv files from cloud storage buckets.
+
+## Example
+
+```
+q)x)SELECT * FROM 'https://datahub.io/core/inflation/_r/-/data/inflation-gdp.csv' WHERE "Country Code" = 'USA' ORDER BY Year DESC LIMIT 10;
+Country       Country Code Year Inflation
+-----------------------------------------
+United States USA          2023 4.116338 
+United States USA          2022 8.0028   
+United States USA          2021 4.697859 
+United States USA          2020 1.233584 
+United States USA          2019 1.81221  
+United States USA          2018 2.442583 
+United States USA          2017 2.13011  
+United States USA          2016 1.261583 
+United States USA          2015 0.1186271
+United States USA          2014 1.622223 
+/ to set a variable with query results
+q)t:.x.e "SELECT * FROM 'https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-01.parquet';"
+q)count t
+3475226
+```
 
 ## Installation
 
-Download the duckdb c/c++ library:
+This client API requires the duckdb c/c++ library which is available here:
+
 https://duckdb.org/docs/installation/?version=stable&environment=cplusplus&platform=linux&download_method=direct&architecture=x86_64
 
-Unzip.
+Unzip to your prefered location.
 
 Option 1: Add libduckdb to your LD_LIBRARY_PATH.
 
@@ -22,28 +45,6 @@ sudo cp ./libduckdb/libduckdb.so /usr/local/lib/
 sudo ldconfig
 ```
 
-Run make.
+Run `make all run`
 
-Copy/symlink the qduck.so file to into $QHOME/l64.
-
-## Test
-
-Create sample data with duckdb. (assumes you have duckdb cli installed)
-
-```
-$ cd test
-$ duckdb < sample.sql
-```
-
-Run sample code.
-
-```
-q qduck.q
-q)t
-col_boolean col_tinyint col_smallint col_integer col_bigint          col_float col_double col_varchar col_date   col_timestamp                ..
-----------------------------------------------------------------------------------------------------------------------------------------------..
-1           127         0W           0W          0W                  3.14      2.718282   Apple       2025.04.19 2025.04.19D12:34:56.000000000..
-0           -128                                                     -3.14     -2.718282  Banana      2000.01.01 2000.01.01D00:00:00.000000000..
-1           42          12345        123456789   1234567890123456789 1.23      4.56       Cherry      2010.06.15 2010.06.15D08:30:00.000000000..
-0           0           0            0           0                   0         0          Date        1999.12.31 1999.12.31D23:59:59.000000000..
-```
+*Note: KDB/Q requires shared libraries to be within the $QHOME/l64. As to not pollute your existing $QHOME directory, the contents of your $QHOME are copied into the build folder and run from the build directory. You may need to change this to suit your needs.*

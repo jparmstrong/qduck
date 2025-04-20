@@ -1,5 +1,7 @@
 #include <duckdb.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "k.h"
 
 // Initialize the DuckDB database and context
@@ -7,9 +9,14 @@ duckdb_database db;
 duckdb_connection con;
 
 // Function to initialize the DuckDB instance
-K init_duckdb(K path) {
-    if (path->t != -11) return krr("type");
-    const char* db_path = path->s;
+K init(K path) {
+    if (path->t != KC) return krr("type");
+
+    char* db_path = (char*)malloc(path->n + 1);
+    if (!db_path) return krr("memory");
+    memcpy(db_path, path->G0, path->n);
+    db_path[path->n] = '\0';
+
     if (duckdb_open(db_path, &db) != DuckDBSuccess) {
         return krr("Could not open DuckDB");
     }
@@ -21,9 +28,13 @@ K init_duckdb(K path) {
 }
 
 // Function to execute SQL queries and return results as KDB table
-K run_query(K query) {
-    if (query->t != -11) return krr("type");
-    const char* sql = query->s;
+K query(K query) {
+    if (query->t != KC) return krr("type");
+
+    char* sql = (char*)malloc(query->n + 1);
+    if (!sql) return krr("memory");
+    memcpy(sql, query->G0, query->n);
+    sql[query->n] = '\0';
     
     duckdb_result result;
     if (duckdb_query(con, sql, &result) != DuckDBSuccess) {
